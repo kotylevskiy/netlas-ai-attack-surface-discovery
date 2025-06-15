@@ -1,5 +1,5 @@
 from typing import Any
-import yaml
+from .aiclient import AISearchDirectionsResponse, AIPartlyAddAnswer
 
 class DiscoveryAiValidator:
     """
@@ -24,31 +24,60 @@ class DiscoveryAiValidator:
         self._directions = directions
         self._max_partly_count = max_partly_count
 
-    def validate(self, answer: str) -> bool:
+    def validate(self, answer: AISearchDirectionsResponse) -> bool:
         """
         Validates the AI response.
 
         Args:
-            answer (str): The AI response to validate.
+            answer (AISearchDirectionsResponse): The AI response to validate.
 
         Returns:
             bool: True if the response is valid, False otherwise.
         """
         try:
-            response_dict = yaml.safe_load(answer)
-            required_keys = ["add", "skip", "partly"]
             received_directions: list[int] = []
-            for key in required_keys:
-                if key not in response_dict or not isinstance(response_dict[key], list) or not all(isinstance(v, int) for v in response_dict[key]):
+            for key in ["add", "skip", "partly"]:
+                if not all(isinstance(v, int) for v in getattr(answer, key, [])):
                     return False
-                received_directions.extend(response_dict[key])
+                received_directions.extend(getattr(answer, key, []))
             direction_ids = [d["id"] for d in self._directions]
             if not all(v in direction_ids for v in received_directions):
                 return False
-            for id in response_dict["partly"]:
+            for id in getattr(answer, "partly", []):
                 count = next(d["count"] for d in self._directions if d["id"] == id)
                 if count > self._max_partly_count:
                     return False
             return True
         except Exception:
             return False
+        
+
+class DiscoveryAiValidatorPartly:
+    """
+    Validates AI responses for the discovery process when adding nodes partly.
+
+    Attributes:
+        _nodes (list[str]): List of nodes to validate against.
+    """
+
+    _nodes: list[str]
+
+    def __init__(self, nodes: list[str]) -> None:
+        """
+        Initializes the DiscoveryAiValidatorPartly instance.
+        Args:
+            nodes (list[str]): A list of nodes to validate against.
+        """
+        self._nodes = nodes
+
+    def validate(self, answer: AIPartlyAddAnswer) -> bool:
+        """
+        Validates the AI response for partly added nodes.
+        Args:
+            answer (AIPartlyAddAnswer): The AI response to validate.
+        Returns:
+            bool: True if the response is valid, False otherwise.
+        """
+        if not all(node in self._nodes for node in answer.nodes):
+            return False
+        return True

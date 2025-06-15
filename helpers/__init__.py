@@ -1,2 +1,2 @@
-from .aiclient import AIClient # type: ignore
-from .aivalidator import DiscoveryAiValidator # type: ignore
+from .aiclient import DiscoveryAIClient # type: ignore
+from .aivalidator import DiscoveryAiValidator, DiscoveryAiValidatorPartly # type: ignore

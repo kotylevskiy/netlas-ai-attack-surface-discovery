@@ -6,7 +6,7 @@ from rich.console import Console
 from rich.color import Color
 
 from discovery import AttackSurface, Node, NodeType
-from helpers import AIClient, DiscoveryAiValidator
+from helpers import DiscoveryAIClient, DiscoveryAiValidator, DiscoveryAiValidatorPartly
 
 
 def main():
@@ -66,7 +66,7 @@ def main():
         repeat_prompt = file.read()
     
     # Initialize the AI client. Target domain is passed with the system prompt to bound the scope.
-    ai = AIClient(OPENAI_API_KEY, OPENAI_MODEL, f"{system_prompt} **{root_domain}**", repeat_prompt)
+    ai = DiscoveryAIClient(OPENAI_API_KEY, OPENAI_MODEL, f"{system_prompt} **{root_domain}**", repeat_prompt)
 
     # Initialize the attack surface with the root domain.
     surface = AttackSurface(api_key=NETLAS_API_KEY, apibase=NETLAS_BASE_URL)
@@ -93,7 +93,7 @@ def main():
                 # Initialize validator and query the AI model to choose search directions
                 output_progress(f"Discovery: Searches for '{node.label}'", yaml.dump(node.to_dict(), sort_keys=False), actor="discovery")
                 validator = DiscoveryAiValidator([d.to_dict() for d in node.searchDirections], 20)
-                answer = yaml.safe_load(ai.query(f"DIRECTION REQUEST:\n\n{yaml.dump(node.to_dict(), sort_keys=False)}", validator=validator.validate))
+                answer = ai.searchDirectionsQuery(f"DIRECTION REQUEST:\n\n {yaml.dump(node.to_dict(), sort_keys=False)}", validator=validator.validate)
                 formatted_answer = "\n".join(f"{key}: {value}" for key, value in answer.items())
                 output_progress(f"{ai.respondedModel}: Decision for {node.label}", formatted_answer, actor="ai")
 
@@ -121,8 +121,8 @@ def main():
                     for i, new_node in enumerate(new_nodes):
                         ai_query = f"PARTLY REQUEST for `{direction}`, part {i}:\n\n"
                         ai_query += "\n".join([f"{item}" for item in new_node])
-                        partly_answer = ai.query(ai_query)
-                        new_node.intersection_update(partly_answer.splitlines())
+                        partly_answer = ai.partlyAddQuery(ai_query, validator=DiscoveryAiValidatorPartly(list(new_node)).validate)
+                        new_node.intersection_update(partly_answer)
                         if len(new_node) == 0:
                             surface.remove(new_node)
                             output_progress(f"Discovery: Search {direction} - {new_node.label} filtered out by Ai", actor="discovery")
